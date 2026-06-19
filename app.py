@@ -16,23 +16,34 @@ CORS(app)
 
 BRAIN_DIR = r"C:\Users\pri27\.gemini\antigravity\brain"
 
+# Calculate local timezone offset relative to UTC (Zulu)
+from datetime import datetime, timedelta
+LOCAL_OFFSET = datetime.now() - datetime.utcnow()
+LOCAL_OFFSET = timedelta(minutes=round(LOCAL_OFFSET.total_seconds() / 60.0))
+
 def estimate_tokens(text):
     if not text:
         return 0
     # Average 3.5 characters per token for a mix of English and code/JSON
     return max(1, int(len(text) / 3.5))
 
-def parse_dt(dt_str):
+def parse_dt(dt_str, to_local=True):
     if not dt_str:
         return None
     for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%S.%f+00:00"):
         try:
-            return datetime.strptime(dt_str.replace("Z", ""), fmt.split(".")[0])
+            dt = datetime.strptime(dt_str.replace("Z", ""), fmt.split(".")[0])
+            if to_local:
+                return dt + LOCAL_OFFSET
+            return dt
         except ValueError:
             continue
     try:
         clean_str = dt_str.split(".")[0].split("+")[0].replace("T", " ").replace("Z", "")
-        return datetime.strptime(clean_str, "%Y-%m-%d %H:%M:%S")
+        dt = datetime.strptime(clean_str, "%Y-%m-%d %H:%M:%S")
+        if to_local:
+            return dt + LOCAL_OFFSET
+        return dt
     except Exception:
         return None
 
@@ -78,7 +89,7 @@ def get_conversation_data(conv_id):
 
 CONV_CACHE = {}
 CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "conv_cache.json")
-CACHE_VERSION = 3
+CACHE_VERSION = 4
 
 def load_cache():
     global CONV_CACHE
@@ -99,7 +110,7 @@ def load_cache():
                         continue
                     if isinstance(v, list) and len(v) == 3:
                         conv_summary = v[2]
-                        if "llm_hours" in conv_summary and "tool_hours" in conv_summary and "project" in conv_summary:
+                        if "llm_hours" in conv_summary and "tool_hours" in conv_summary and "project" in conv_summary and "daily_breakdown" in conv_summary:
                             if "pool" not in conv_summary:
                                 conv_summary["pool"] = "gemini"
                             temp_cache[k] = (v[0], v[1], conv_summary)
@@ -190,6 +201,9 @@ def summarize_conversations():
         history_char_count = 0
         conv_tools = {}
         
+        # New daily breakdown structure
+        daily_breakdown = {}
+        
         llm_hours = [0] * 24
         tool_hours = [0] * 24
         
@@ -211,13 +225,31 @@ def summarize_conversations():
             
             step_tokens = content_tokens + thinking_tokens + tool_calls_tokens
             
-            step_dt = parse_dt(step.get("created_at"))
+            step_dt = parse_dt(step.get("created_at"), to_local=True)
+            
+            step_total_tokens = 0
+            if source == "MODEL" and step_type == "PLANNER_RESPONSE":
+                step_total_tokens = step_tokens + estimate_tokens(" " * history_char_count)
+                
             if step_dt:
+                step_day_str = step_dt.strftime("%Y-%m-%d")
                 step_hour = step_dt.hour
+                
+                if step_day_str not in daily_breakdown:
+                    daily_breakdown[step_day_str] = {
+                        "llm_hours": [0] * 24,
+                        "tool_hours": [0] * 24,
+                        "total_tokens": 0
+                    }
+                
                 if source == "MODEL" and step_type == "PLANNER_RESPONSE":
                     llm_hours[step_hour] += step_tokens
+                    daily_breakdown[step_day_str]["llm_hours"][step_hour] += step_tokens
                 elif source == "MODEL" and step_type != "PLANNER_RESPONSE":
                     tool_hours[step_hour] += step_tokens
+                    daily_breakdown[step_day_str]["tool_hours"][step_hour] += step_tokens
+                    
+                daily_breakdown[step_day_str]["total_tokens"] += step_total_tokens
             
             if source == "MODEL" and step_type == "PLANNER_RESPONSE":
                 # Model invocation: context contains all history up to now
@@ -351,6 +383,7 @@ def summarize_conversations():
             "output_tokens": llm_output_tokens,
             "total_tokens": llm_input_tokens + llm_output_tokens,
             "tool_tokens": tool_io_tokens,
+            "daily_breakdown": daily_breakdown,
             "steps": len(steps),
             "tools_called": tool_calls_count,
             "errors": errors_count,
@@ -602,29 +635,41 @@ def get_stats():
         }
         
     for c in convs:
-        conv_dt = datetime.fromtimestamp(c["timestamp"])
-        day_str = conv_dt.strftime("%Y-%m-%d")
-        
-        # In range of last 30 days?
-        if conv_dt >= cutoff_30d:
-            recent_30d_tokens += c["total_tokens"]
-            
-        # Ensure day exists
-        if day_str not in daily_stats:
-            daily_stats[day_str] = {
-                "llm_hours": [0] * 24,
-                "tool_hours": [0] * 24,
-                "total_tokens": 0
+        daily_breakdown = c.get("daily_breakdown", {})
+        if not daily_breakdown:
+            conv_dt = datetime.fromtimestamp(c["timestamp"])
+            day_str = conv_dt.strftime("%Y-%m-%d")
+            daily_breakdown = {
+                day_str: {
+                    "llm_hours": c.get("llm_hours", [0] * 24),
+                    "tool_hours": c.get("tool_hours", [0] * 24),
+                    "total_tokens": c.get("total_tokens", 0)
+                }
             }
             
-        daily_stats[day_str]["total_tokens"] += c["total_tokens"]
-        
-        # Aggregate pre-computed hourly stats directly
-        c_llm = c.get("llm_hours", [0] * 24)
-        c_tool = c.get("tool_hours", [0] * 24)
-        for h in range(24):
-            daily_stats[day_str]["llm_hours"][h] += c_llm[h]
-            daily_stats[day_str]["tool_hours"][h] += c_tool[h]
+        for day_str, stats in daily_breakdown.items():
+            try:
+                day_dt = datetime.strptime(day_str, "%Y-%m-%d")
+            except Exception:
+                continue
+                
+            if day_dt >= cutoff_30d:
+                recent_30d_tokens += stats.get("total_tokens", 0)
+                
+            if day_str not in daily_stats:
+                daily_stats[day_str] = {
+                    "llm_hours": [0] * 24,
+                    "tool_hours": [0] * 24,
+                    "total_tokens": 0
+                }
+                
+            daily_stats[day_str]["total_tokens"] += stats.get("total_tokens", 0)
+            
+            c_llm = stats.get("llm_hours", [0] * 24)
+            c_tool = stats.get("tool_hours", [0] * 24)
+            for h in range(24):
+                daily_stats[day_str]["llm_hours"][h] += c_llm[h]
+                daily_stats[day_str]["tool_hours"][h] += c_tool[h]
 
     # Peak day
     peak_day_tokens = 0
