@@ -1,36 +1,40 @@
-# Antigravity Developer & Prompt Cache Dashboard
+# Antigravity Agent Usage & Prompt Optimization Dashboard
 
-A premium developer control panel and prompt optimization dashboard. This application provides real-time Gemini & third-party API quota tracking, cache efficiency visualization, timeline log explorers, and a progressive rules & phase manager designed to optimize coding agent prompts and context usage.
+A developer control panel designed to monitor coding agent runs, analyze token consumption footprint, inspect execution logs, and optimize prompt caching layouts.
 
 ---
 
-## 🚀 Key Features
+## 🚀 Active Features
 
-### 1. Multi-Account Quota HUD
-* **Concurrent Pools**: Track Gemini and third-party models (Claude/GPT) separately for up to 4 accounts in a responsive side-by-side bento layout.
-* **Unified Remaining Indicators**: Circular progress meters indicating left-over capacity (flashing red if $\le 10\%$, orange if $\le 30\%$).
-* **Offline IDE Syncing**: Safely parses active IDE quota state databases (`state.vscdb`) offline using custom protobuf decoders to automatically sync remaining credits and emails.
+### 1. Overview Analytics Dashboard
+* **Visual Activity Heatmaps**: Color-coded calendar grids showing daily activity (orange grid for Gemini, blue grid for Claude/third-party API tokens).
+* **Token Trend Line Chart**: Dynamic SVG chart tracking daily token consumption over the last 30 days.
+* **KPI Metrics Scorecard**: Cards displaying total completed vs crashed runs, peak day consumption, active streaks, average session length, and 30-day token volumes.
+* **Project Summaries**: Hierarchical breakdown of token usage and total execution runs grouped by project folders.
+* **Tool Success Rates**: Performance indicators tracking the most frequent tool invocations and their success-to-error ratios.
 
-### 2. Prompt Guardian & Cache Optimizer
-* **Visual Cache Heatmap**: Color-codes prompt lines (static rules in green vs volatile variables like `{Cwd}`, `{files}` in red/orange) to visualize cache alignment.
-* **One-Click Restructuring**: Auto-reorders templates to keep static code guidelines at the top (cached) and volatile context placeholders at the bottom.
-* **USD Cost & Savings Estimator**: Calculates real-time cost-per-million predictions ($1.25 uncached vs $0.30 cached) based on volatile placement.
+### 2. Conversation Log Explorer
+* **Intelligent Grouping & Sorting**: Group execution logs by project, subagent type, or calendar date. Filter by status (completed/crashed) or sort by recency and token weight.
+* **Subagent Hierarchy Map**: Collapsible tree canvas that dynamically visualizes the execution chain of subagents.
+* **Timeline Performance Pagination**: Caps loaded steps to 80 (rendering the first 30 steps, a performance divider, and the last 30 steps) to prevent browser thread lockups on massive 1,000+ step logs.
+* **Token Efficiency Scorecard**: Calculates a performance grade (A-F) based on cache hit ratios, redundant file reads, and renders a diagnostic chart of the top 5 token-bloating payload events.
 
-### 3. Rules & Phase Manager
-* **Sequential Phase Tabs**: Organize guidelines by developmental stages (e.g. `General Rules`, `Phase 1: Ingestion`, `Phase 2: Graph Network`).
-* **Interactive Compiler Checklist**: Check/uncheck specific phase tabs to dynamically compile active rules and exclude future/past rules from prompt bloat.
-* **Compaction-Resistant Storage**: Save active rules directly to your project's `.agents/AGENTS.md` (which the agent re-injects on every single turn).
-* **Modular @Skills Export**: Convert finished phases into standalone skills (e.g., `.agents/skills/phase-1/SKILL.md`) to pull them back into context on-demand.
+### 3. TokenHUD Prompt Cache Optimizer
+* **Cache Prefix Heatmap**: Color-codes prompt lines in real-time (static instructions in green vs volatile context variables like `{Cwd}`, `{files}` in red/orange) to display cache alignment.
+* **One-Click Optimizer**: Restructures prompts automatically, pushing static guidelines to the top (maximizing cached prefix length) and volatile variables to the bottom.
+* **Savings Predictor**: Calculates real-time cost-per-million estimations ($1.25 uncached vs $0.30 cached) and computes active USD savings based on rules structuring.
 
-### 4. Codebase Token Weight Map
-* **Recursive Workspace Scan**: Scans project files, sorts them by token size, and displays them with color-coded risk alerts:
+### 4. Rules & Phase Manager
+* **Sprint Phase Tabs**: Organize prompt instructions into sequential development phases (e.g. `General`, `Phase 1: Database`, `Phase 2: UI`).
+* **Active Compiler Checkbox**: Check or uncheck specific phases to dynamically stitch them into the prompt compiler, keeping irrelevant phase instructions out of active context.
+* **Save to Disk**: Commit compiled active rules directly to your project's `.agents/AGENTS.md` (dynamically loaded by the agent on every turn to prevent loss during history compaction).
+* **Modular @Skills Catalog**: Export completed phase instructions into standalone skill markdown files (e.g. `@phase-1`). Enables searching, checkbox-bubbling, and auto-detecting rules to pull them back into context only when referenced.
+
+### 5. Codebase Token Weight Map
+* **Footprint Scan**: Recursively lists and ranks files in the active workspace by token weight, displaying colored alert badges:
   * 🔴 **Cache Risk**: Files $>20,000$ tokens (high context bloat risk).
   * 🟡 **Medium Risk**: Files between $8,000$ and $20,000$ tokens.
   * 🟢 **Safe**: Files $<8,000$ tokens.
-
-### 5. Timeline Logs & Performance Pagination
-* **Performance Pagination**: Caps loaded steps to $80$ items (rendering first $30$, a dashed divider, and last $30$ with an optional `[Load All]` trigger) to prevent browser threads from freezing on massive $1000+$ step conversation histories.
-* **Scorecards & Diagnostics**: Computes grading (A-F) based on cache hit ratios, redundant file reads, and displays a bar chart of the top 5 tool payload bloaters.
 
 ---
 
@@ -41,11 +45,11 @@ antigravity-dashboard/
 ├── .agents/               # Project-level prompt rules configurations
 │   ├── AGENTS.md          # Active compiled ruleset loaded by agent
 │   └── phases.json        # Saved development phase tabs database
-├── app.py                 # Flask server with offline quota & token scanning logic
+├── app.py                 # Flask server with log scanner, token weight calculations, and APIs
 ├── run.ps1                # PowerShell launcher script
 ├── static/
-│   ├── dashboard.js       # UI state, prompting calculations, and websocket manager
-│   └── style.css          # Premium modern dark-theme styling
+│   ├── dashboard.js       # UI state, prompting calculations, and layout managers
+│   └── style.css          # Modern dark-theme styling
 └── templates/
     └── index.html         # Main dashboard layout
 ```
@@ -54,12 +58,8 @@ antigravity-dashboard/
 
 ## 🛠️ Installation & Setup
 
-### Prerequisites
-* Python 3.8+ installed on your system.
-* Active Git configurations.
-
 ### 1. Set Up Environment
-Create and activate a local virtual environment:
+Create and activate a local Python virtual environment:
 
 ```bash
 # Windows (PowerShell)
@@ -72,7 +72,7 @@ source venv/bin/activate
 ```
 
 ### 2. Install Dependencies
-Install Flask and its cross-origin resource sharing library:
+Install the required packages (no external binaries or complex databases needed):
 
 ```bash
 pip install flask flask-cors
@@ -82,22 +82,20 @@ pip install flask flask-cors
 
 ## 🏃 Running the Application
 
-There are two ways to start the dashboard:
-
-### Method A: Using the PowerShell Script (Windows)
-Run the launcher script to automatically start the server and launch the web browser:
+### Method A: PowerShell Script (Windows)
+Run the launcher script to start the server and automatically launch the web browser:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\run.ps1
 ```
 
-### Method B: Standard Python Execution
-Start the backend manually:
+### Method B: Standard Python Start
+Start the backend server:
 
 ```bash
 python app.py
 ```
 
-Then, open your web browser and navigate to:
+Then, open your web browser and go to:
 👉 **[http://127.0.0.1:5000](http://127.0.0.1:5000)**
