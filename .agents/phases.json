@@ -1,0 +1,17 @@
+[
+  {
+    "content": "# General Rules\n\n- Prefer clean formatting\n- Move dynamic variables to the end of prompts",
+    "enabled": true,
+    "name": "General"
+  },
+  {
+    "content": "# Phase 1 Rules\n\n- Write phase instructions here...",
+    "enabled": true,
+    "name": "Phase 1"
+  },
+  {
+    "name": "Phase 2",
+    "enabled": true,
+    "content": "# Phase 2 Rules\n\n- Write phase instructions here..."
+  }
+]
